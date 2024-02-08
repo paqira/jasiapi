@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jasiapi"
+authors = [
+    { name = "Kentaro Tatsumi", email = "paqira.2019@gmail.com" },
+]
+description = "Unofficial binding of JMA Seismic Intensity DB Search (気象庁震度データベース検索) API"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = []
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "requests>=2.31",
+]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "jasiapi.__version__" }
+
+[project.urls]
+"Repository" = "https://github.com/paqira/jasiapi"
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "doc",
+]
+
+lint.select = [
+    "E",
+    "F",
+    "W",
+    "C90",
+    "I",
+    "N",
+    "B",
+    "D",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+required-imports = [
+    "from __future__ import annotations",
+]
