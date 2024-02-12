@@ -10,7 +10,11 @@ authors = [
 description = "Unofficial Python binding of JMA Seismic Intensity DB Search (気象庁震度データベース検索) API"
 readme = "README.md"
 requires-python = ">=3.8"
-keywords = []
+keywords = [
+    "earthquake",
+    "気象庁震度データベース検索",
+    "JMA Seismic Intensity DB Search"
+]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
