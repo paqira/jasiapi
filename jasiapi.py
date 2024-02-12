@@ -156,6 +156,7 @@ def _solve_station_info(  # noqa: C901
         station_intensity = 1
     else:
         station_intensity = _parse_input_intensity(station_intensity)
+
     return _station_pref, _station_city, _station, station_intensity
 
 
@@ -174,55 +175,52 @@ def earthquake(
     epicenter_region: Sequence[str] | None = None,
     epicenter_area: Sequence[tuple[float, float]] = None,
 ) -> list[Earthquake]:
-    """Search for earthquakes (a.k.a. hypocenter).
+    """Search for earthquakes (or hypocenters).
 
-    The conditions are **AND** condition except `station_pref`, `station_city` and `station`.
-
-    It searches for earthquakes whose seismic intensity was observed in that area
-    or by seismic intensity station, if one specify
-    `station_pref`, `station_city`, `station` and/or `station_intensity`.
-
-    If `epicenter_region` and/or `epicenter_area` is specified,
-    it searches for earthquakes whose hypocenter locates at the region/area.
+    It evaluates the condition as **AND** condition
+    except `station_pref`, `station_city` and `station`.
 
     `station_pref`, `station_city` and `station` accept Japanese name only,
-    :class:`CodeResolver` helps to find such names and codes.
+    :class:`CodeResolver` helps to find such names and its codes.
+
+    Notes, it only returns first 1,000 results **without warning**,
+    if the number of the event exceeds 1,000.
 
     Args:
-        start: search earthquake which occurs after the date (inclusive),
+        start: search earthquakes which occurs after the date (inclusive),
                supports :obj:`'yyyy/mm/dd hh:mm'` and :obj:`'yyyy-mm-dd hh:mm'` formats
                when :obj:`str` given
-        end: search earthquake which occurs before the date (may inclusive),
+        end: search earthquakes which occurs before the date (may inclusive),
              support the same format of `start`
-        magnitude: magnitude range (inclusive) of earthquake
-        depth: depth (km) range (inclusive) of earthquake
-        intensity: maximum JMA seismic intensity of the resulting earthquake is equal or greater than.
-                   The value means the JAM seismic intensity,
-                   especially, :obj:`'5L'` and :obj:`'A'` means *5 Lower*,
-                   :obj:`'5H'` and :obj:`'B'` does *5 Higher*,
-                   :obj:`'6L'` and :obj:`'C'` does *6 Lower*,
-                   and :obj:`'6H'` and :obj:`'D'` does *6 Higher*.
-        sort: sorting method, we note that it only returns first 1,000 results **without warning**;
-              :obj:`'start'` means 'start to end' search,
-              :obj:`'end'` does end to start,
-              and :obj:`'intensity'` means largest to smallest by maximum intensity
-              and :obj:`'scale'` does largest to smallest by scale
+        magnitude: the magnitude range (inclusive) of the earthquake
+        depth: the depth (km) range (inclusive) of the earthquake
+        intensity: the minimum of the maximum JMA seismic intensity of the earthquake,
+                   The value is measured by the JAM seismic intensity;
+                   :obj:`'5L'` and :obj:`'A'` indicate *5 Lower*,
+                   :obj:`'5H'` and :obj:`'B'` do *5 Higher*,
+                   :obj:`'6L'` and :obj:`'C'` v *6 Lower*,
+                   and :obj:`'6H'` and :obj:`'D'` do *6 Higher*
+        sort: sorting method;
+              :obj:`'start'` indecates "start to end" search,
+              :obj:`'end'` does "end to start",
+              :obj:`'intensity'` does largest to smallest by maximum intensity,
+              and :obj:`'scale'` does largest to smallest by _scale_ (規模)
               (author: unclear what scale means...)
         station_pref: prefecture code/name where the station, which observed the earthquake, is located
         station_city: city code/name where the station, which observed the earthquake, is located,
-                 `station_pref` ignores when specified
+                 `station_pref` ignores if this specifies
         station: station code/name which observed the earthquake,
-                 `station_pref` and `station_city` ignore when specified
-        station_intensity: search earthquakes which observed JMA seismic intensity is equal or greater than
-        epicenter_region: region name of epicenter
+                 `station_pref` and `station_city` ignore if this specifies
+        station_intensity: the minimum JMA seismic intensity of the earthquake
+        epicenter_region: region name of the epicenter
         epicenter_area: corners (a pair of latitude and longitude in decimal degree)
-                        of area that epicenter is in (convex hull)
+                        of area that the epicenter is in (supports convex hull)
 
     Returns:
         a list of :class:`Earthquake` (hypocenter info)
 
     Raises:
-        BadRequestError: if the search failed
+        BadRequestError: if search failed
 
     Examples:
         >>> # Search earthquake satisfies all following conditions:
@@ -231,16 +229,16 @@ def earthquake(
         ...     "2000/01/01 00:00", "2020/01/01 00:00",
         ...     # 2. magnitude is between 2 and 10
         ...     magnitude=(2, 10),
-        ...     # 3. depth of hypocenter is between 10 km and 100 km
+        ...     # 3. depth of the hypocenter is between 10 km and 100 km
         ...     depth=(10, 100),
-        ...     # 4. observed maximum intensity is 3, at least
+        ...     # 4. maximum intensity is 3, at least
         ...     intensity=3,
-        ...     # (search by higher to lower on intensity)
+        ...     # (search by largest to smallest on maximum intensity)
         ...     sort="intensity",
-        ...     # 5. observed, at least, intensity 4 at Tokyo
+        ...     # 5. observed intensity 4 at Tokyo, at least
         ...     station_pref=["東京都", ],
         ...     station_intensity=4,
-        ...     # 6. epicenter locates the pacific coast of Tohoku
+        ...     # 6. the epicenter locates the pacific coast of Tohoku
         ...     epicenter_area=[(35.1, 142.14), (41.29, 142.14), (41.29, 145.68), (35.1, 145.68)],
         ... )
         >>> eqs
@@ -324,33 +322,39 @@ def statistics(
     See :func:`earthquake` for detail.
 
     Args:
-        start: search earthquake which occurs after the date (inclusive),
+        start: search earthquakes which occurs after the date (inclusive),
                supports :obj:`'yyyy/mm/dd hh:mm'` and :obj:`'yyyy-mm-dd hh:mm'` formats
                when :obj:`str` given
-        end: search earthquake which occurs before the date (may inclusive),
+        end: search earthquakes which occurs before the date (may inclusive),
              support the same format of `start`
-        magnitude: magnitude range (inclusive) of earthquake
-        depth: depth (km) range (inclusive) of earthquake
-        intensity: maximum JMA seismic intensity of the resulting earthquake is equal or greater than
-        method: method of aggrigation, :obj:`'day'` is aviable for 1 month search duration,
+        magnitude: the magnitude range (inclusive) of the earthquake
+        depth: the depth (km) range (inclusive) of the earthquake
+        intensity: the minimum of the maximum JMA seismic intensity of the earthquake,
+                   The value is measured by the JAM seismic intensity;
+                   :obj:`'5L'` and :obj:`'A'` indicate *5 Lower*,
+                   :obj:`'5H'` and :obj:`'B'` do *5 Higher*,
+                   :obj:`'6L'` and :obj:`'C'` v *6 Lower*,
+                   and :obj:`'6H'` and :obj:`'D'` do *6 Higher*
+        method: the method of aggrigation,
+                :obj:`'day'` is aviable for 1 month search duration,
                 and :obj:`'month'` is three years search duration;
                 it automatically determins the method from data when :obj:`None` given;
                 it aggs by hour on short duration search
         station_pref: prefecture code/name where the station, which observed the earthquake, is located
         station_city: city code/name where the station, which observed the earthquake, is located,
-                 `station_pref` ignore when specified
+                 `station_pref` ignores if this specifies
         station: station code/name which observed the earthquake,
-                 `station_pref` and `station_city` ignore when specified
-        station_intensity: search earthquakes which observed JMA seismic intensity is equal or greater than
-        epicenter_region: region name of epicenter
+                 `station_pref` and `station_city` ignore if this specifies
+        station_intensity: the minimum JMA seismic intensity of the earthquake
+        epicenter_region: region name of the epicenter
         epicenter_area: corners (a pair of latitude and longitude in decimal degree)
-                        of area that epicenter is in (convex hull)
+                        of area that the epicenter is in (supports convex hull)
 
     Returns:
         a pair of :class:`Statistics` list and :obj:`StatisticsSummary`
 
     Raises:
-        BadRequestError: if the search failed
+        BadRequestError: if search failed
 
     Examples:
         >>> # Search earthquake satisfies all following conditions:
@@ -359,16 +363,16 @@ def statistics(
         ...     "2000/01/01 00:00", "2020/01/01 00:00",
         ...     # 2. magnitude is between 2 and 10
         ...     magnitude=(2, 10),
-        ...     # 3. depth of hypocenter is between 10 km and 100 km
+        ...     # 3. depth of the hypocenter is between 10 km and 100 km
         ...     depth=(10, 100),
-        ...     # 4. observed maximum intensity is 3, at least
+        ...     # 4. maximum intensity is 3, at least
         ...     intensity=3,
         ...     # (agg by year)
         ...     method="year",
-        ...     # 5. observed, at least, intensity 4 at Tokyo
+        ...     # 5. observed intensity 4 at Tokyo, at least
         ...     station_pref=["東京都", ],
         ...     station_intensity=4,
-        ...     # 6. epicenter locates the pacific coast of Tohoku
+        ...     # 6. the epicenter locates the pacific coast of Tohoku
         ...     epicenter_area=[(35.1, 142.14), (41.29, 142.14), (41.29, 145.68), (35.1, 145.68)],
         ... )
         >>> stats
@@ -449,16 +453,16 @@ def statistics(
 
 
 def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
-    """Search observed JMA seismic intensity of the earthquake.
+    """Search JMA seismic intensity of the earthquake.
 
     Args:
-        id: ID of earthquake, i.e. :attr:`Earthquake.id` that :func:`earthquake` returns
+        id: ID of the earthquake, i.e. :attr:`Earthquake.id` that :func:`earthquake` returns
 
     Returns:
         A pair of observed intensities and the queried earthquake data
 
     Raises:
-        BadRequestError: if the search failed
+        BadRequestError: if search failed
 
     Examples:
         >>> ints, eq = intensity('20110311144618')
@@ -587,7 +591,7 @@ class Intensity(NamedTuple):
 class CodeResolver:
     """Resolver of prefecture/city/station code to name each other.
 
-    We note that this fetches data from the official cite
+    We note that this fetches data from the official Web page
     when calling :meth:`__init__`.
     """
 

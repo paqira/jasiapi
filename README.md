@@ -39,13 +39,13 @@ earthquakes = jasiapi.earthquake(
     # 3. depth of hypocenter is between 10 km and 100 km,
     # 3. かつ、震源の深さが 10 km から 100 km 
     depth=(10, 100),
-    # 4. observed maximum intensity is 3, at least,
-    # 4. 観測した最大震度が少なくとも震度 3
+    # 4. maximum intensity is 3, at least,
+    # 4. 最大震度が少なくとも震度 3
     intensity=3,
-    # (search by higher to lower on intensity)
-    # （震度の降順（大から小）で検索）
+    # (search by largest to smallest on maximum intensity)
+    # （最大震度の降順（大から小）で検索）
     sort="intensity",
-    # 5. observed, at least, intensity 4 at Tokyo,
+    # 5. observed intensity 4 at Tokyo, at least
     # 5. 東京都で少なくとも震度 4 を観測
     station_pref=["東京都", ],
     station_intensity=4,
