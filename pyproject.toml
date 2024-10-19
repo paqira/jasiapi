@@ -1,61 +1,49 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "jasiapi"
-authors = [
-    { name = "Kentaro Tatsumi", email = "paqira.2019@gmail.com" },
-]
+dynamic = ["version"]
 description = "Unofficial Python binding of JMA Seismic Intensity DB Search (気象庁震度データベース検索) API"
 readme = "README.md"
 requires-python = ">=3.8"
+license = { text = "MIT" }
 keywords = [
     "earthquake",
     "気象庁震度データベース検索",
     "JMA Seismic Intensity DB Search"
 ]
-license = { text = "MIT" }
+authors = [
+    { name = "Kentaro Tatsumi", email = "paqira.2019@gmail.com" },
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
     "requests>=2.31",
 ]
-dynamic = ["version"]
-
-[tool.setuptools.dynamic]
-version = { attr = "jasiapi.__version__" }
 
 [project.urls]
-"Repository" = "https://github.com/paqira/jasiapi"
+Documentation = "https://github.com/paqira/jasiapi#readme"
+Issues = "https://github.com/paqira/jasiapi/issues"
+Source = "https://github.com/paqira/jasiapi"
 
-[tool.black]
-line-length = 120
+[tool.hatch.version]
+path = "jasiapi.py"
 
-[tool.ruff]
-line-length = 120
-exclude = [
-    "doc",
+[tool.hatch.envs.types]
+extra-dependencies = [
+    "mypy>=1.0.0",
 ]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/x tests}"
 
-lint.select = [
-    "E",
-    "F",
-    "W",
-    "C90",
-    "I",
-    "N",
-    "B",
-    "D",
-]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.isort]
-required-imports = [
-    "from __future__ import annotations",
-]
