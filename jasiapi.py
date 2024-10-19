@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from functools import cached_property
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
 if TYPE_CHECKING:
@@ -88,7 +89,219 @@ PREFECTURE: Final = {
 }
 
 # global state of code resolver
-_code_resolver: CodeResolver | None = None
+
+
+class CodeResolver:
+    """Resolver of prefecture/city/station code to name each other.
+
+    We note that this fetches data from the official Web page
+    when calling :meth:`__init__`.
+    """
+
+    @cached_property
+    def _prefecture(self) -> dict[int, str]:
+        return PREFECTURE
+
+    @cached_property
+    def _prefecture_rev(self) -> dict[str, int]:
+        return {v: k for k, v in PREFECTURE.items()}
+
+    @cached_property
+    def _city(self) -> dict[int, str]:
+        res = requests.get(CITY, timeout=TIMEOUT)
+        return {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
+
+    @cached_property
+    def _city_rev(self) -> dict[str, int]:
+        return {v: k for k, v in self._city.items()}
+
+    @cached_property
+    def _station(self) -> dict[int, str]:
+        res = requests.get(STATION, timeout=TIMEOUT)
+        return {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
+
+    @cached_property
+    def _region(self) -> tuple[str]:
+        res = requests.get(EPICENTER, timeout=TIMEOUT)
+        return tuple(obj["name"] for obj in res.json())
+
+    @cached_property
+    def _station_rev(self) -> dict[str, int]:
+        return {v: k for k, v in self._station.items()}
+
+    def prefecture_codes(self) -> tuple[int, ...]:
+        """Returns all prefecture codes."""
+        return tuple(self._prefecture.keys())
+
+    def prefecture_names(self) -> tuple[str, ...]:
+        """Returns all prefecture names."""
+        return tuple(self._prefecture.values())
+
+    def prefecture_name(self, code: int | str) -> str:
+        """Resolve prefecture name from code.
+
+        Args:
+            code: prefecture code
+
+        Returns:
+            its prefecture name (in Japanese)
+        """
+        return self._prefecture[int(code)]
+
+    def prefecture_code(self, name: str) -> int:
+        """Resolve prefecture code from name.
+
+        Args:
+            name: prefecture name (in Japanese)
+
+        Returns:
+            its prefecture code
+        """
+        return self._prefecture_rev[name]
+
+    def is_prefecture_code(self, code: int | str) -> bool:
+        """Test `code` is valid prefecture code or not.
+
+        Args:
+            code: prefecture code
+
+        Returns:
+            :obj:`True` if `code` is valid prefecture code
+        """
+        return int(code) in self._prefecture
+
+    def is_prefecture_name(self, name: str) -> bool:
+        """Test `name` is valid prefecture name or not.
+
+        Args:
+            name: prefecture name
+
+        Returns:
+            :obj:`True` if `name` is valid prefecture name
+        """
+        return name in self._prefecture
+
+    def city_codes(self) -> tuple[int, ...]:
+        """Returns all city codes."""
+        return tuple(self._city.keys())
+
+    def city_names(self) -> tuple[str, ...]:
+        """Returns all city names."""
+        return tuple(self._city.values())
+
+    def city_name(self, code: int | str) -> str:
+        """Resolve city name from code.
+
+        Args:
+            code: city code
+
+        Returns:
+            its city name (in Japanese)
+        """
+        return self._city[int(code)]
+
+    def city_code(self, name: str) -> int:
+        """Resolve city code from name.
+
+        Args:
+            name: city name (in Japanese)
+
+        Returns:
+            its city code
+        """
+        return self._city_rev[name]
+
+    def is_city_code(self, code: int | str) -> bool:
+        """Test `code` is valid city code or not.
+
+        Args:
+            code: city code
+
+        Returns:
+            :obj:`True` if `code` is valid city code
+        """
+        return int(code) in self._city
+
+    def is_city_name(self, name: str) -> bool:
+        """Test `name` is valid city name or not.
+
+        Args:
+            name: city name
+
+        Returns:
+            :obj:`True` if `name` is valid city name
+        """
+        return name in self._city_rev
+
+    def station_codes(self) -> tuple[int, ...]:
+        """Returns all seismic station code."""
+        return tuple(self._station.keys())
+
+    def station_names(self) -> tuple[str, ...]:
+        """Returns all seismic station names."""
+        return tuple(self._station.values())
+
+    def station_name(self, code: int | str) -> str:
+        """Resolve seismic station name from code.
+
+        Args:
+            code: seismic station code
+
+        Returns:
+            its seismic station name (in Japanese)
+        """
+        return self._station[int(code)]
+
+    def station_code(self, name: str) -> int:
+        """Resolve seismic station code from name.
+
+        Args:
+            name: seismic station name (in Japanese)
+
+        Returns:
+            its seismic station code
+        """
+        return self._station_rev[name]
+
+    def is_station_code(self, code: int | str) -> bool:
+        """Test `code` is valid seismic station code or not.
+
+        Args:
+            code: seismic station code
+
+        Returns:
+            :obj:`True` if `code` is valid seismic station code
+        """
+        return int(code) in self._station
+
+    def is_station_name(self, name: str) -> bool:
+        """Test `name` is valid seismic station name or not.
+
+        Args:
+            name: prefecture name
+
+        Returns:
+            :obj:`True` if `name` is valid seismic station name
+        """
+        return name in self._station_rev
+
+    def region_names(self) -> tuple[str]:
+        """Returns all region names."""
+        return self._region
+
+    def is_region_name(self, name: str) -> bool:
+        """Test `name` is valid region name or not.
+
+        Args:
+            name: region name
+
+        Returns:
+            :obj:`True` if `name` is valid region name
+        """
+        return name in self._region
+
+
+_code_resolver = CodeResolver()
 
 
 class Error(Exception):
@@ -485,205 +698,6 @@ class Intensity(NamedTuple):
     """Observed JAM seismic intensity"""
 
 
-class CodeResolver:
-    """Resolver of prefecture/city/station code to name each other.
-
-    We note that this fetches data from the official Web page
-    when calling :meth:`__init__`.
-    """
-
-    _prefecture: Final[dict[int, str]] = PREFECTURE
-    _prefecture_rev: Final[dict[str, int]] = {v: k for k, v in PREFECTURE.items()}
-    _city: Final[dict[int, str]]
-    _city_rev: Final[dict[str, int]]
-    _station: Final[dict[int, str]]
-    _station_rev: Final[dict[str, int]]
-    _region: Final[tuple[str]]
-
-    def __init__(self):
-        res = requests.get(CITY, timeout=TIMEOUT)
-        self._city = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
-        self._city_rev = {v: k for k, v in self._city.items()}
-
-        res = requests.get(STATION, timeout=TIMEOUT)
-        self._station = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
-        self._station_rev = {v: k for k, v in self._station.items()}
-
-        res = requests.get(EPICENTER, timeout=TIMEOUT)
-        self._region = tuple(obj["name"] for obj in res.json())
-
-    def prefecture_codes(self) -> tuple[int, ...]:
-        """Returns all prefecture codes."""
-        return tuple(self._prefecture.keys())
-
-    def prefecture_names(self) -> tuple[str, ...]:
-        """Returns all prefecture names."""
-        return tuple(self._prefecture.values())
-
-    def prefecture_name(self, code: int | str) -> str:
-        """Resolve prefecture name from code.
-
-        Args:
-            code: prefecture code
-
-        Returns:
-            its prefecture name (in Japanese)
-        """
-        return self._prefecture[int(code)]
-
-    def prefecture_code(self, name: str) -> int:
-        """Resolve prefecture code from name.
-
-        Args:
-            name: prefecture name (in Japanese)
-
-        Returns:
-            its prefecture code
-        """
-        return self._prefecture_rev[name]
-
-    def is_prefecture_code(self, code: int | str) -> bool:
-        """Test `code` is valid prefecture code or not.
-
-        Args:
-            code: prefecture code
-
-        Returns:
-            :obj:`True` if `code` is valid prefecture code
-        """
-        return int(code) in self._prefecture
-
-    def is_prefecture_name(self, name: str) -> bool:
-        """Test `name` is valid prefecture name or not.
-
-        Args:
-            name: prefecture name
-
-        Returns:
-            :obj:`True` if `name` is valid prefecture name
-        """
-        return name in self._prefecture
-
-    def city_codes(self) -> tuple[int, ...]:
-        """Returns all city codes."""
-        return tuple(self._city.keys())
-
-    def city_names(self) -> tuple[str, ...]:
-        """Returns all city names."""
-        return tuple(self._city.values())
-
-    def city_name(self, code: int | str) -> str:
-        """Resolve city name from code.
-
-        Args:
-            code: city code
-
-        Returns:
-            its city name (in Japanese)
-        """
-        return self._city[int(code)]
-
-    def city_code(self, name: str) -> int:
-        """Resolve city code from name.
-
-        Args:
-            name: city name (in Japanese)
-
-        Returns:
-            its city code
-        """
-        return self._city_rev[name]
-
-    def is_city_code(self, code: int | str) -> bool:
-        """Test `code` is valid city code or not.
-
-        Args:
-            code: city code
-
-        Returns:
-            :obj:`True` if `code` is valid city code
-        """
-        return int(code) in self._city
-
-    def is_city_name(self, name: str) -> bool:
-        """Test `name` is valid city name or not.
-
-        Args:
-            name: city name
-
-        Returns:
-            :obj:`True` if `name` is valid city name
-        """
-        return name in self._city_rev
-
-    def station_codes(self) -> tuple[int, ...]:
-        """Returns all seismic station code."""
-        return tuple(self._station.keys())
-
-    def station_names(self) -> tuple[str, ...]:
-        """Returns all seismic station names."""
-        return tuple(self._station.values())
-
-    def station_name(self, code: int | str) -> str:
-        """Resolve seismic station name from code.
-
-        Args:
-            code: seismic station code
-
-        Returns:
-            its seismic station name (in Japanese)
-        """
-        return self._station[int(code)]
-
-    def station_code(self, name: str) -> int:
-        """Resolve seismic station code from name.
-
-        Args:
-            name: seismic station name (in Japanese)
-
-        Returns:
-            its seismic station code
-        """
-        return self._station_rev[name]
-
-    def is_station_code(self, code: int | str) -> bool:
-        """Test `code` is valid seismic station code or not.
-
-        Args:
-            code: seismic station code
-
-        Returns:
-            :obj:`True` if `code` is valid seismic station code
-        """
-        return int(code) in self._station
-
-    def is_station_name(self, name: str) -> bool:
-        """Test `name` is valid seismic station name or not.
-
-        Args:
-            name: prefecture name
-
-        Returns:
-            :obj:`True` if `name` is valid seismic station name
-        """
-        return name in self._station_rev
-
-    def region_names(self) -> tuple[str]:
-        """Returns all region names."""
-        return self._region
-
-    def is_region_name(self, name: str) -> bool:
-        """Test `name` is valid region name or not.
-
-        Args:
-            name: region name
-
-        Returns:
-            :obj:`True` if `name` is valid region name
-        """
-        return name in self._region
-
-
 def _earthquake_data(
     start: dt.datetime | dt.date | str,
     end: dt.datetime | dt.date | str,
@@ -860,14 +874,9 @@ def _parse_input_station_info(
     station: Sequence[int | str] | None,
     station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None,
 ):
-    global _code_resolver  # noqa: PLW0603
-
     if station_pref is None:
         _station_pref = [99]
     else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
         _station_pref = []
         for pref in station_pref:
             if pref in _code_resolver.prefecture_codes():
@@ -879,9 +888,6 @@ def _parse_input_station_info(
     if station_city is None:
         _station_city = [99]
     else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
         _station_city = []
         for city in station_city:
             if city in _code_resolver.city_codes():
@@ -893,9 +899,6 @@ def _parse_input_station_info(
     if station is None:
         _station = [99]
     else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
         _station = []
         for st in station:
             if st in _code_resolver.station_codes():
