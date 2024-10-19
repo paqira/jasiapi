@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Final, Literal, NamedTuple, Sequence
+from typing import TYPE_CHECKING, Literal, NamedTuple
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Any, Final
 
 import requests
 
@@ -23,6 +27,8 @@ __all__ = [
 ]
 
 __version__ = "0.1.0"
+
+TIMEOUT: Final = 30
 
 TOP: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/index.html"
 URL: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/api/api.php"
@@ -104,12 +110,10 @@ def earthquake(
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[
-        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
-    ]
-    | None = None,
+    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None = None,
     epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[Sequence[float]] = None,
+    epicenter_area: Sequence[Sequence[float]] | None = None,
+    timeout: int = TIMEOUT,
 ) -> list[Earthquake]:
     """Search for earthquakes (or hypocenters).
 
@@ -151,6 +155,7 @@ def earthquake(
         epicenter_region: region name of the epicenter
         epicenter_area: corners (a pair of latitude and longitude in decimal degree)
                         of area that the epicenter is in (supports convex hull)
+        timeout: timeout of the request
 
     Returns:
         a list of :class:`Earthquake` (hypocenter info)
@@ -162,7 +167,8 @@ def earthquake(
         >>> # Search earthquake satisfies all following conditions:
         ... eqs = earthquake(
         ...     # 1. the event date is between:
-        ...     "2000/01/01 00:00", "2020/01/01 00:00",
+        ...     "2000/01/01 00:00",
+        ...     "2020/01/01 00:00",
         ...     # 2. magnitude is between 2 and 10
         ...     magnitude=(2, 10),
         ...     # 3. depth of the hypocenter is between 10 km and 100 km
@@ -172,10 +178,17 @@ def earthquake(
         ...     # (search by largest to smallest on maximum intensity)
         ...     sort="intensity",
         ...     # 5. observed intensity 4 at Tokyo, at least
-        ...     station_pref=["東京都", ],
+        ...     station_pref=[
+        ...         "東京都",
+        ...     ],
         ...     station_intensity=4,
         ...     # 6. the epicenter locates the pacific coast of Tohoku
-        ...     epicenter_area=[(35.1, 142.14), (41.29, 142.14), (41.29, 145.68), (35.1, 145.68)],
+        ...     epicenter_area=[
+        ...         (35.1, 142.14),
+        ...         (41.29, 142.14),
+        ...         (41.29, 145.68),
+        ...         (35.1, 145.68),
+        ...     ],
         ... )
         >>> eqs
         [
@@ -207,7 +220,7 @@ def earthquake(
         epicenter_area=epicenter_area,
     )
 
-    json = _request(data=data)
+    json = _request(data=data, timeout=timeout)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
@@ -222,15 +235,14 @@ def statistics(
     magnitude: tuple[float, float] = (0.0, 9.9),
     depth: tuple[float, float] = (0, 999),
     intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = 1,
-    method: Literal["year", "month", "day"] = None,
+    method: Literal["year", "month", "day"] | None = None,
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[
-        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
-    ] = None,
+    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None = None,
     epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[Sequence[float]] = None,
+    epicenter_area: Sequence[Sequence[float]] | None = None,
+    timeout: int = TIMEOUT,
 ) -> tuple[list[Statistics], StatisticsSummary | None]:
     """Search occurrence of earthquake.
 
@@ -264,6 +276,7 @@ def statistics(
         epicenter_region: region name of the epicenter
         epicenter_area: corners (a pair of latitude and longitude in decimal degree)
                         of area that the epicenter is in (supports convex hull)
+        timeout: timeout of the request
 
     Returns:
         a pair of :class:`Statistics` list and :obj:`StatisticsSummary`
@@ -275,7 +288,8 @@ def statistics(
         >>> # Search earthquake satisfies all following conditions:
         ... stats, summary = statistics(
         ...     # 1. the event date is between:
-        ...     "2000/01/01 00:00", "2020/01/01 00:00",
+        ...     "2000/01/01 00:00",
+        ...     "2020/01/01 00:00",
         ...     # 2. magnitude is between 2 and 10
         ...     magnitude=(2, 10),
         ...     # 3. depth of the hypocenter is between 10 km and 100 km
@@ -285,10 +299,17 @@ def statistics(
         ...     # (agg by year)
         ...     method="year",
         ...     # 5. observed intensity 4 at Tokyo, at least
-        ...     station_pref=["東京都", ],
+        ...     station_pref=[
+        ...         "東京都",
+        ...     ],
         ...     station_intensity=4,
         ...     # 6. the epicenter locates the pacific coast of Tohoku
-        ...     epicenter_area=[(35.1, 142.14), (41.29, 142.14), (41.29, 145.68), (35.1, 145.68)],
+        ...     epicenter_area=[
+        ...         (35.1, 142.14),
+        ...         (41.29, 142.14),
+        ...         (41.29, 145.68),
+        ...         (35.1, 145.68),
+        ...     ],
         ... )
         >>> stats
         [
@@ -316,7 +337,7 @@ def statistics(
         epicenter_area=epicenter_area,
     )
 
-    json = _request(data=data)
+    json = _request(data=data, timeout=timeout)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
@@ -324,11 +345,15 @@ def statistics(
     return _statistics_parse(json)
 
 
-def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
+def intensity(
+    id: str,  # noqa: A002
+    timeout: int = TIMEOUT,
+) -> tuple[list[Intensity], Earthquake]:
     """Search JMA seismic intensity of the earthquake.
 
     Args:
         id: ID of the earthquake, i.e. :attr:`Earthquake.id` that :func:`earthquake` returns
+        timeout: timeout of the request
 
     Returns:
         A pair of observed intensities and the queried earthquake data
@@ -337,7 +362,7 @@ def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
         BadRequestError: if search failed
 
     Examples:
-        >>> ints, eq = intensity('20110311144618')
+        >>> ints, eq = intensity("20110311144618")
         >>> ints
         [
             Intensity(
@@ -360,15 +385,15 @@ def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
             magnitude=9.0,
             intensity=7
         )
-    """
+    """  # noqa: RUF002
     data = _intensity_data(id)
 
-    json = _request(data=data)
+    json = _request(data=data, timeout=timeout)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
 
-    assert (
+    assert (  # noqa: S101
         len(json["res"]["hyp"]) == 1
     ), "unexpected response, make issue with query data"
     return _intensity_parse(json)
@@ -476,19 +501,15 @@ class CodeResolver:
     _region: Final[tuple[str]]
 
     def __init__(self):
-        res = requests.get(CITY)
-        self._city = {
-            int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]
-        }
+        res = requests.get(CITY, timeout=TIMEOUT)
+        self._city = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
         self._city_rev = {v: k for k, v in self._city.items()}
 
-        res = requests.get(STATION)
-        self._station = {
-            int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]
-        }
+        res = requests.get(STATION, timeout=TIMEOUT)
+        self._station = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
         self._station_rev = {v: k for k, v in self._station.items()}
 
-        res = requests.get(EPICENTER)
+        res = requests.get(EPICENTER, timeout=TIMEOUT)
         self._region = tuple(obj["name"] for obj in res.json())
 
     def prefecture_codes(self) -> tuple[int, ...]:
@@ -673,12 +694,9 @@ def _earthquake_data(
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[
-        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
-    ]
-    | None = None,
+    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None = None,
     epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[Sequence[float]] = None,
+    epicenter_area: Sequence[Sequence[float]] | None = None,
 ):
     _intensity = _parse_input_intensity(intensity)
 
@@ -690,19 +708,17 @@ def _earthquake_data(
         epicenter_region,
         epicenter_area,
     )
-    is_additional_cond = any(map(lambda v: v is not None, args))
+    is_additional_cond = any(v is not None for v in args)
 
-    args = (station_pref, station_city, start, station_intensity)
-    is_station_mode = any(map(lambda v: v is not None, args))
+    args = (station_pref, station_city, start, station_intensity)  # type:ignore
+    is_station_mode = any(v is not None for v in args)
 
-    _station_pref, _station_city, _station, station_intensity = (
-        _parse_input_station_info(
-            station_pref, station_city, station, station_intensity
-        )
+    _station_pref, _station_city, _station, station_intensity = _parse_input_station_info(
+        station_pref, station_city, station, station_intensity
     )
 
     if epicenter_region is None:
-        epicenter_region = [99]
+        epicenter_region = ["99"]
 
     data = {
         "mode": "search",
@@ -741,15 +757,13 @@ def _statistics_data(
     magnitude: tuple[float, float] = (0.0, 9.9),
     depth: tuple[float, float] = (0, 999),
     intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = 1,
-    method: Literal["year", "month", "day"] = None,
+    method: Literal["year", "month", "day"] | None = None,
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[
-        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
-    ] = None,
-    epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[Sequence[float]] = None,
+    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None = None,
+    epicenter_region: Sequence[int | str] | None = None,
+    epicenter_area: Sequence[Sequence[float]] | None = None,
 ) -> dict:
     _intensity = _parse_input_intensity(intensity)
 
@@ -761,15 +775,13 @@ def _statistics_data(
         epicenter_region,
         epicenter_area,
     )
-    is_additional_cond = any(map(lambda v: v is not None, args))
+    is_additional_cond = any(v is not None for v in args)
 
-    args = (station_pref, station_city, start, station_intensity)
-    is_station_mode = any(map(lambda v: v is not None, args))
+    args = (station_pref, station_city, start, station_intensity)  # type:ignore
+    is_station_mode = any(v is not None for v in args)
 
-    _station_pref, _station_city, _station, station_intensity = (
-        _parse_input_station_info(
-            station_pref, station_city, station, station_intensity
-        )
+    _station_pref, _station_city, _station, station_intensity = _parse_input_station_info(
+        station_pref, station_city, station, station_intensity
     )
 
     if epicenter_region is None:
@@ -824,7 +836,9 @@ def _statistics_parse(json: dict):
     return result, summary
 
 
-def _intensity_data(id: str) -> dict:
+def _intensity_data(
+    id: str,  # noqa: A002
+) -> dict:
     return {
         "mode": "event",
         "id": id,
@@ -832,13 +846,11 @@ def _intensity_data(id: str) -> dict:
 
 
 def _intensity_parse(json: dict) -> tuple[list[Intensity], Earthquake]:
-    return list(map(_parse_intensity, json["res"]["int"])), _parse_earthquake(
-        json["res"]["hyp"][0]
-    )
+    return list(map(_parse_intensity, json["res"]["int"])), _parse_earthquake(json["res"]["hyp"][0])
 
 
-def _request(data: dict[str, Any]):
-    res = requests.post(URL, data=data)
+def _request(data: dict[str, Any], timeout):
+    res = requests.post(URL, data=data, timeout=timeout)
     return res.json()
 
 
@@ -846,12 +858,9 @@ def _parse_input_station_info(
     station_pref: Sequence[int | str] | None,
     station_city: Sequence[int | str] | None,
     station: Sequence[int | str] | None,
-    station_intensity: Literal[
-        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
-    ]
-    | None,
+    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None,
 ):
-    global _code_resolver
+    global _code_resolver  # noqa: PLW0603
 
     if station_pref is None:
         _station_pref = [99]
@@ -862,9 +871,9 @@ def _parse_input_station_info(
         _station_pref = []
         for pref in station_pref:
             if pref in _code_resolver.prefecture_codes():
-                _station_pref.append(pref)
+                _station_pref.append(pref)  # type: ignore
             else:
-                data = _code_resolver.prefecture_code(pref)
+                data = _code_resolver.prefecture_code(pref)  # type: ignore
                 _station_pref.append(data)
 
     if station_city is None:
@@ -876,9 +885,9 @@ def _parse_input_station_info(
         _station_city = []
         for city in station_city:
             if city in _code_resolver.city_codes():
-                _station_city.append(city)
+                _station_city.append(city)  # type: ignore
             else:
-                data = _code_resolver.city_code(city)
+                data = _code_resolver.city_code(city)  # type: ignore
                 _station_city.append(data)
 
     if station is None:
@@ -890,15 +899,12 @@ def _parse_input_station_info(
         _station = []
         for st in station:
             if st in _code_resolver.station_codes():
-                _station.append(st)
+                _station.append(st)  # type: ignore
             else:
-                data = _code_resolver.station_code(st)
-                _station.append(data)
+                data = _code_resolver.station_code(st)  # type: ignore
+                _station.append(data)  # type: ignore
 
-    if station_intensity is None:
-        station_intensity = 1
-    else:
-        station_intensity = _parse_input_intensity(station_intensity)
+    station_intensity = 1 if station_intensity is None else _parse_input_intensity(station_intensity)
 
     return _station_pref, _station_city, _station, station_intensity
 
@@ -907,7 +913,7 @@ def _parse_input_date(data: dt.datetime | dt.date | str):
     if isinstance(data, str):
         for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M"):
             try:
-                data = dt.datetime.strptime(data, fmt)
+                data = dt.datetime.strptime(data, fmt)  # type: ignore  # noqa: DTZ007
             except ValueError:
                 continue
             else:
@@ -921,9 +927,9 @@ def _parse_input_date(data: dt.datetime | dt.date | str):
 
 
 def _parse_input_intensity(v):
-    if v == "5L":
+    if v == "5L":  # noqa: SIM116
         return "A"
-    elif v == "5H":
+    elif v == "5H":  # noqa: RET505
         return "B"
     elif v == "6L":
         return "C"
@@ -935,18 +941,17 @@ def _parse_input_intensity(v):
 def _parse_input_area(v: Sequence[Sequence[int | float]]):
     result = {}
     for idx, row in enumerate(v):
-        if len(row) != 2:
-            raise ValueError(
-                f"length of epicenter_area's component must be 2, we got {len(row)} at {idx} corner"
-            )
+        if len(row) != 2:  # noqa: PLR2004
+            msg = f"length of epicenter_area's component must be 2, we got {len(row)} at {idx} corner"
+            raise ValueError(msg)
         result[f"boundsAr[{idx}][]"] = tuple(row)
     return result
 
 
 def _parse_input_sort(v: str):
-    if v == "start":
+    if v == "start":  # noqa: SIM116
         return "S0"
-    elif v == "end":
+    elif v == "end":  # noqa: RET505
         return "S1"
     elif v == "intensity":
         return "S2"
@@ -958,7 +963,7 @@ def _parse_input_sort(v: str):
 def _parse_input_window(v: str | None):
     if v is None:
         return "C0"
-    elif v == "day":
+    elif v == "day":  # noqa: RET505
         return "C1"
     elif v == "month":
         return "C2"
@@ -968,9 +973,9 @@ def _parse_input_window(v: str | None):
 
 
 def _parse_str_intensity(s: str) -> Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7]:
-    if s == "震度１":
+    if s == "震度１":  # noqa: SIM116
         return 1
-    elif s == "震度２":
+    elif s == "震度２":  # noqa: RET505
         return 2
     elif s == "震度３":
         return 3
@@ -991,7 +996,7 @@ def _parse_str_intensity(s: str) -> Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 
 
 def _parse_earthquake(d: dict):
     dep, unit = d["dep"].split(" ")
-    assert unit == "km"
+    assert unit == "km"  # noqa: S101
 
     try:
         mag = float(d["mag"])
@@ -1000,9 +1005,7 @@ def _parse_earthquake(d: dict):
 
     return Earthquake(
         id=d["id"],
-        time=dt.datetime.strptime(d["ot"], "%Y/%m/%d %H:%M:%S.%f").replace(
-            tzinfo=dt.timezone(dt.timedelta(hours=9))
-        ),
+        time=dt.datetime.strptime(d["ot"], "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=dt.timezone(dt.timedelta(hours=9))),
         location=d["name"],
         # latS=d["latS"],
         # lngS=d["lonS"],
@@ -1028,9 +1031,7 @@ def _parse_statistics(d: dict):
     lb: str = d["lb"]
     for unit, fmt in specs:  # noqa: B007
         try:
-            key = dt.datetime.strptime(lb, fmt).replace(
-                tzinfo=dt.timezone(dt.timedelta(hours=9))
-            )
+            key = dt.datetime.strptime(lb, fmt).replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
         except ValueError:
             continue
         else:
@@ -1040,7 +1041,7 @@ def _parse_statistics(d: dict):
 
     return Statistics(
         key=key,
-        unit=unit,
+        unit=unit,  # type: ignore
         one=int(d["S1"]) if d["S1"] else 0,
         two=int(d["S2"]) if d["S2"] else 0,
         three=int(d["S3"]) if d["S3"] else 0,
