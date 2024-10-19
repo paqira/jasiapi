@@ -45,7 +45,7 @@ extra-dependencies = [
     "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/x tests}"
+check = "mypy --install-types --non-interactive {args:jasiapi.py}"
 
 # hatch.build
 
@@ -54,3 +54,9 @@ skip-excluded-dirs = true
 
 [tool.hatch.build.targets.sdist]
 only-include = ["jasiapi.py", ]
+
+[tool.ruff]
+exclude = [
+    "tests",
+    "doc",
+]
