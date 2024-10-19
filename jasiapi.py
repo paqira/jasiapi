@@ -88,76 +88,9 @@ _code_resolver: CodeResolver | None = None
 class Error(Exception):
     """Base error class."""
 
-    pass
-
 
 class BadRequestError(Error, IOError):
     """Error of request failed."""
-
-    pass
-
-
-def _request(data: dict[str, Any]):
-    res = requests.post(URL, data=data)
-    return res.json()
-
-
-def _solve_station_info(  # noqa: C901
-    station_pref: Sequence[int | str] | None,
-    station_city: Sequence[int | str] | None,
-    station: Sequence[int | str] | None,
-    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None,
-):
-    global _code_resolver
-
-    if station_pref is None:
-        _station_pref = [99]
-    else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
-        _station_pref = []
-        for pref in station_pref:
-            if pref in _code_resolver.prefecture_codes():
-                _station_pref.append(pref)
-            else:
-                data = _code_resolver.prefecture_code(pref)
-                _station_pref.append(data)
-
-    if station_city is None:
-        _station_city = [99]
-    else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
-        _station_city = []
-        for city in station_city:
-            if city in _code_resolver.city_codes():
-                _station_city.append(city)
-            else:
-                data = _code_resolver.city_code(city)
-                _station_city.append(data)
-
-    if station is None:
-        _station = [99]
-    else:
-        if _code_resolver is None:
-            _code_resolver = CodeResolver()
-
-        _station = []
-        for st in station:
-            if st in _code_resolver.station_codes():
-                _station.append(st)
-            else:
-                data = _code_resolver.station_code(st)
-                _station.append(data)
-
-    if station_intensity is None:
-        station_intensity = 1
-    else:
-        station_intensity = _parse_input_intensity(station_intensity)
-
-    return _station_pref, _station_city, _station, station_intensity
 
 
 def earthquake(
@@ -171,9 +104,12 @@ def earthquake(
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] | None = None,
+    station_intensity: Literal[
+        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
+    ]
+    | None = None,
     epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[tuple[float, float]] = None,
+    epicenter_area: Sequence[Sequence[float]] = None,
 ) -> list[Earthquake]:
     """Search for earthquakes (or hypocenters).
 
@@ -256,56 +192,33 @@ def earthquake(
             # and go on
         ]
     """
-    _intensity = _parse_input_intensity(intensity)
-
-    args = (station_pref, station_city, station, station_intensity, epicenter_region, epicenter_area)
-    is_additional_cond = any(map(lambda v: v is not None, args))
-
-    args = (station_pref, station_city, start, station_intensity)
-    is_station_mode = any(map(lambda v: v is not None, args))
-
-    _station_pref, _station_city, _station, station_intensity = _solve_station_info(
-        station_pref, station_city, station, station_intensity
+    data = _earthquake_data(
+        start=start,
+        end=end,
+        magnitude=magnitude,
+        depth=depth,
+        intensity=intensity,
+        sort=sort,
+        station_pref=station_pref,
+        station_city=station_city,
+        station=station,
+        station_intensity=station_intensity,
+        epicenter_region=epicenter_region,
+        epicenter_area=epicenter_area,
     )
-
-    if epicenter_region is None:
-        epicenter_region = [99]
-
-    data = {
-        "mode": "search",
-        "dateTimeF[]": _parse_input_date(start),
-        "dateTimeT[]": _parse_input_date(end),
-        "mag[]": magnitude,
-        "dep[]": depth,
-        "maxInt": _intensity,
-        "Sort": _parse_input_sort(sort),
-        "Comp": "C0",  # for stats.
-        #
-        "additionalC": "true" if is_additional_cond else "false",
-        #
-        "observed": "true" if is_station_mode else "false",
-        "pref[]": _station_pref,
-        "city[]": _station_city,
-        "station[]": _station,
-        "obsInt": station_intensity,
-        "epi[]": epicenter_region,
-        # "ture" if stats. mode
-        "seisCount": "false",
-    }
-
-    if epicenter_area is not None:
-        data = {**data, **_parse_input_area(epicenter_area)}
 
     json = _request(data=data)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
-    return list(map(_parse_earthquake, json["res"]))
+
+    return _earthquake_parse(json)
 
 
 def statistics(
     start: dt.datetime | dt.date | str,
     end: dt.datetime | dt.date | str,
+    *,
     magnitude: tuple[float, float] = (0.0, 9.9),
     depth: tuple[float, float] = (0, 999),
     intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = 1,
@@ -313,9 +226,11 @@ def statistics(
     station_pref: Sequence[int | str] | None = None,
     station_city: Sequence[int | str] | None = None,
     station: Sequence[int | str] | None = None,
-    station_intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = None,
+    station_intensity: Literal[
+        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
+    ] = None,
     epicenter_region: Sequence[str] | None = None,
-    epicenter_area: Sequence[tuple[float, float]] = None,
+    epicenter_area: Sequence[Sequence[float]] = None,
 ) -> tuple[list[Statistics], StatisticsSummary | None]:
     """Search occurrence of earthquake.
 
@@ -358,7 +273,7 @@ def statistics(
 
     Examples:
         >>> # Search earthquake satisfies all following conditions:
-        ... stats, summary = earthquake(
+        ... stats, summary = statistics(
         ...     # 1. the event date is between:
         ...     "2000/01/01 00:00", "2020/01/01 00:00",
         ...     # 2. magnitude is between 2 and 10
@@ -386,70 +301,27 @@ def statistics(
         >>> summary
         StatisticsSummary(one=0, two=0, three=0, four=2, five_L=0, five_H=1, six_L=0, six_H=0, seven=0)
     """
-    _intensity = _parse_input_intensity(intensity)
-
-    args = (station_pref, station_city, station, station_intensity, epicenter_region, epicenter_area)
-    is_additional_cond = any(map(lambda v: v is not None, args))
-
-    args = (station_pref, station_city, start, station_intensity)
-    is_station_mode = any(map(lambda v: v is not None, args))
-
-    _station_pref, _station_city, _station, station_intensity = _solve_station_info(
-        station_pref, station_city, station, station_intensity
+    data = _statistics_data(
+        start=start,
+        end=end,
+        magnitude=magnitude,
+        depth=depth,
+        intensity=intensity,
+        method=method,
+        station_pref=station_pref,
+        station_city=station_city,
+        station=station,
+        station_intensity=station_intensity,
+        epicenter_region=epicenter_region,
+        epicenter_area=epicenter_area,
     )
-
-    if epicenter_region is None:
-        epicenter_region = [99]
-
-    data = {
-        "mode": "search",
-        "dateTimeF[]": _parse_input_date(start),
-        "dateTimeT[]": _parse_input_date(end),
-        "mag[]": magnitude,
-        "dep[]": depth,
-        "maxInt": _intensity,
-        "Sort": "S0",  # for earthquake
-        "Comp": _parse_input_window(method),
-        #
-        "additionalC": "true" if is_additional_cond else "false",
-        #
-        "observed": "true" if is_station_mode else "false",
-        "pref[]": _station_pref,
-        "city[]": _station_city,
-        "station[]": _station,
-        "obsInt": station_intensity,
-        "epi[]": epicenter_region,
-        # "ture" if stats. mode
-        "seisCount": "true",
-    }
-
-    if epicenter_area is not None:
-        data = {**data, **_parse_input_area(epicenter_area)}
 
     json = _request(data=data)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
 
-    result = []
-    summary = None
-    for d in json["res"]:
-        if d["lb"] == "合計":
-            summary = StatisticsSummary(
-                one=int(d["S1"]) if d["S1"] else 0,
-                two=int(d["S2"]) if d["S2"] else 0,
-                three=int(d["S3"]) if d["S3"] else 0,
-                four=int(d["S4"]) if d["S4"] else 0,
-                five_L=int(d["SA"]) if d["SA"] else 0,
-                five_H=int(d["SB"]) if d["SB"] else 0,
-                six_L=int(d["SC"]) if d["SC"] else 0,
-                six_H=int(d["SD"]) if d["SD"] else 0,
-                seven=int(d["S7"]) if d["S7"] else 0,
-            )
-        else:
-            data = _parse_statistics(d)
-            result.append(data)
-    return result, summary
+    return _statistics_parse(json)
 
 
 def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
@@ -470,7 +342,7 @@ def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
         [
             Intensity(
                 station_name='栗原市築館（旧）＊',
-                station_code=2205220,
+                station_number=2205220,
                 latitude=38.73,
                 longitude=38.73,
                 intensity=7
@@ -489,17 +361,17 @@ def intensity(id: str) -> tuple[list[Intensity], Earthquake]:
             intensity=7
         )
     """
-    data = {
-        "mode": "event",
-        "id": id,
-    }
+    data = _intensity_data(id)
 
     json = _request(data=data)
 
     if isinstance(json["res"], str):
         raise BadRequestError(json["res"])
-    assert len(json["res"]["hyp"]) == 1, "unexpected response, make issue with query data"
-    return list(map(_parse_intensity, json["res"]["int"])), _parse_earthquake(json["res"]["hyp"][0])
+
+    assert (
+        len(json["res"]["hyp"]) == 1
+    ), "unexpected response, make issue with query data"
+    return _intensity_parse(json)
 
 
 class Earthquake(NamedTuple):
@@ -603,13 +475,17 @@ class CodeResolver:
     _station_rev: Final[dict[str, int]]
     _region: Final[tuple[str]]
 
-    def __init__(self):  # noqa: D107
+    def __init__(self):
         res = requests.get(CITY)
-        self._city = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
+        self._city = {
+            int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]
+        }
         self._city_rev = {v: k for k, v in self._city.items()}
 
         res = requests.get(STATION)
-        self._station = {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
+        self._station = {
+            int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]
+        }
         self._station_rev = {v: k for k, v in self._station.items()}
 
         res = requests.get(EPICENTER)
@@ -787,6 +663,246 @@ class CodeResolver:
         return name in self._region
 
 
+def _earthquake_data(
+    start: dt.datetime | dt.date | str,
+    end: dt.datetime | dt.date | str,
+    magnitude: tuple[float, float] = (0.0, 9.9),
+    depth: tuple[int, int] = (0, 999),
+    intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = 1,
+    sort: Literal["start", "end", "intensity", "scale"] = "start",
+    station_pref: Sequence[int | str] | None = None,
+    station_city: Sequence[int | str] | None = None,
+    station: Sequence[int | str] | None = None,
+    station_intensity: Literal[
+        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
+    ]
+    | None = None,
+    epicenter_region: Sequence[str] | None = None,
+    epicenter_area: Sequence[Sequence[float]] = None,
+):
+    _intensity = _parse_input_intensity(intensity)
+
+    args = (
+        station_pref,
+        station_city,
+        station,
+        station_intensity,
+        epicenter_region,
+        epicenter_area,
+    )
+    is_additional_cond = any(map(lambda v: v is not None, args))
+
+    args = (station_pref, station_city, start, station_intensity)
+    is_station_mode = any(map(lambda v: v is not None, args))
+
+    _station_pref, _station_city, _station, station_intensity = (
+        _parse_input_station_info(
+            station_pref, station_city, station, station_intensity
+        )
+    )
+
+    if epicenter_region is None:
+        epicenter_region = [99]
+
+    data = {
+        "mode": "search",
+        "dateTimeF[]": _parse_input_date(start),
+        "dateTimeT[]": _parse_input_date(end),
+        "mag[]": magnitude,
+        "dep[]": depth,
+        "maxInt": _intensity,
+        "Sort": _parse_input_sort(sort),
+        "Comp": "C0",  # for stats.
+        #
+        "additionalC": "true" if is_additional_cond else "false",
+        #
+        "observed": "true" if is_station_mode else "false",
+        "pref[]": _station_pref,
+        "city[]": _station_city,
+        "station[]": _station,
+        "obsInt": station_intensity,
+        "epi[]": epicenter_region,
+        # "ture" if stats. mode
+        "seisCount": "false",
+    }
+
+    if epicenter_area is not None:
+        data = {**data, **_parse_input_area(epicenter_area)}
+    return data
+
+
+def _earthquake_parse(json: dict):
+    return list(map(_parse_earthquake, json["res"]))
+
+
+def _statistics_data(
+    start: dt.datetime | dt.date | str,
+    end: dt.datetime | dt.date | str,
+    magnitude: tuple[float, float] = (0.0, 9.9),
+    depth: tuple[float, float] = (0, 999),
+    intensity: Literal[1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"] = 1,
+    method: Literal["year", "month", "day"] = None,
+    station_pref: Sequence[int | str] | None = None,
+    station_city: Sequence[int | str] | None = None,
+    station: Sequence[int | str] | None = None,
+    station_intensity: Literal[
+        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
+    ] = None,
+    epicenter_region: Sequence[str] | None = None,
+    epicenter_area: Sequence[Sequence[float]] = None,
+) -> dict:
+    _intensity = _parse_input_intensity(intensity)
+
+    args = (
+        station_pref,
+        station_city,
+        station,
+        station_intensity,
+        epicenter_region,
+        epicenter_area,
+    )
+    is_additional_cond = any(map(lambda v: v is not None, args))
+
+    args = (station_pref, station_city, start, station_intensity)
+    is_station_mode = any(map(lambda v: v is not None, args))
+
+    _station_pref, _station_city, _station, station_intensity = (
+        _parse_input_station_info(
+            station_pref, station_city, station, station_intensity
+        )
+    )
+
+    if epicenter_region is None:
+        epicenter_region = [99]
+
+    data = {
+        "mode": "search",
+        "dateTimeF[]": _parse_input_date(start),
+        "dateTimeT[]": _parse_input_date(end),
+        "mag[]": magnitude,
+        "dep[]": depth,
+        "maxInt": _intensity,
+        "Sort": "S0",  # for earthquake
+        "Comp": _parse_input_window(method),
+        #
+        "additionalC": "true" if is_additional_cond else "false",
+        #
+        "observed": "true" if is_station_mode else "false",
+        "pref[]": _station_pref,
+        "city[]": _station_city,
+        "station[]": _station,
+        "obsInt": station_intensity,
+        "epi[]": epicenter_region,
+        # "ture" if stats. mode
+        "seisCount": "true",
+    }
+
+    if epicenter_area is not None:
+        data = {**data, **_parse_input_area(epicenter_area)}
+    return data
+
+
+def _statistics_parse(json: dict):
+    result = []
+    summary = None
+    for d in json["res"]:
+        if d["lb"] == "合計":
+            summary = StatisticsSummary(
+                one=int(d["S1"]) if d["S1"] else 0,
+                two=int(d["S2"]) if d["S2"] else 0,
+                three=int(d["S3"]) if d["S3"] else 0,
+                four=int(d["S4"]) if d["S4"] else 0,
+                five_L=int(d["SA"]) if d["SA"] else 0,
+                five_H=int(d["SB"]) if d["SB"] else 0,
+                six_L=int(d["SC"]) if d["SC"] else 0,
+                six_H=int(d["SD"]) if d["SD"] else 0,
+                seven=int(d["S7"]) if d["S7"] else 0,
+            )
+        else:
+            data = _parse_statistics(d)
+            result.append(data)
+    return result, summary
+
+
+def _intensity_data(id: str) -> dict:
+    return {
+        "mode": "event",
+        "id": id,
+    }
+
+
+def _intensity_parse(json: dict) -> tuple[list[Intensity], Earthquake]:
+    return list(map(_parse_intensity, json["res"]["int"])), _parse_earthquake(
+        json["res"]["hyp"][0]
+    )
+
+
+def _request(data: dict[str, Any]):
+    res = requests.post(URL, data=data)
+    return res.json()
+
+
+def _parse_input_station_info(
+    station_pref: Sequence[int | str] | None,
+    station_city: Sequence[int | str] | None,
+    station: Sequence[int | str] | None,
+    station_intensity: Literal[
+        1, 2, 3, 4, "5L", "5H", "6L", "6H", 7, "A", "B", "C", "D"
+    ]
+    | None,
+):
+    global _code_resolver
+
+    if station_pref is None:
+        _station_pref = [99]
+    else:
+        if _code_resolver is None:
+            _code_resolver = CodeResolver()
+
+        _station_pref = []
+        for pref in station_pref:
+            if pref in _code_resolver.prefecture_codes():
+                _station_pref.append(pref)
+            else:
+                data = _code_resolver.prefecture_code(pref)
+                _station_pref.append(data)
+
+    if station_city is None:
+        _station_city = [99]
+    else:
+        if _code_resolver is None:
+            _code_resolver = CodeResolver()
+
+        _station_city = []
+        for city in station_city:
+            if city in _code_resolver.city_codes():
+                _station_city.append(city)
+            else:
+                data = _code_resolver.city_code(city)
+                _station_city.append(data)
+
+    if station is None:
+        _station = [99]
+    else:
+        if _code_resolver is None:
+            _code_resolver = CodeResolver()
+
+        _station = []
+        for st in station:
+            if st in _code_resolver.station_codes():
+                _station.append(st)
+            else:
+                data = _code_resolver.station_code(st)
+                _station.append(data)
+
+    if station_intensity is None:
+        station_intensity = 1
+    else:
+        station_intensity = _parse_input_intensity(station_intensity)
+
+    return _station_pref, _station_city, _station, station_intensity
+
+
 def _parse_input_date(data: dt.datetime | dt.date | str):
     if isinstance(data, str):
         for fmt in ("%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M"):
@@ -798,7 +914,10 @@ def _parse_input_date(data: dt.datetime | dt.date | str):
                 break
         else:
             raise ValueError(data)
-    return [data.strftime("%Y-%m-%d"), data.strftime("%H:%M") if isinstance(data, dt.datetime) else "00:00"]
+    return [
+        data.strftime("%Y-%m-%d"),
+        data.strftime("%H:%M") if isinstance(data, dt.datetime) else "00:00",
+    ]
 
 
 def _parse_input_intensity(v):
@@ -813,8 +932,15 @@ def _parse_input_intensity(v):
     return v
 
 
-def _parse_input_area(v: Sequence[tuple[float, float]]):
-    return {f"boundsAr[{idx}][]": row for idx, row in enumerate(v)}
+def _parse_input_area(v: Sequence[Sequence[int | float]]):
+    result = {}
+    for idx, row in enumerate(v):
+        if len(row) != 2:
+            raise ValueError(
+                f"length of epicenter_area's component must be 2, we got {len(row)} at {idx} corner"
+            )
+        result[f"boundsAr[{idx}][]"] = tuple(row)
+    return result
 
 
 def _parse_input_sort(v: str):
@@ -874,7 +1000,9 @@ def _parse_earthquake(d: dict):
 
     return Earthquake(
         id=d["id"],
-        time=dt.datetime.strptime(d["ot"], "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=dt.timezone(dt.timedelta(hours=9))),
+        time=dt.datetime.strptime(d["ot"], "%Y/%m/%d %H:%M:%S.%f").replace(
+            tzinfo=dt.timezone(dt.timedelta(hours=9))
+        ),
         location=d["name"],
         # latS=d["latS"],
         # lngS=d["lonS"],
@@ -900,7 +1028,9 @@ def _parse_statistics(d: dict):
     lb: str = d["lb"]
     for unit, fmt in specs:  # noqa: B007
         try:
-            key = dt.datetime.strptime(lb, fmt).replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
+            key = dt.datetime.strptime(lb, fmt).replace(
+                tzinfo=dt.timezone(dt.timedelta(hours=9))
+            )
         except ValueError:
             continue
         else:
