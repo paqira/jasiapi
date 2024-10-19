@@ -1,7 +1,7 @@
+import datetime as dt
 import unittest
 
-from jasiapi import intensity, Earthquake, Intensity
-import datetime as dt
+from jasiapi import Earthquake, Intensity, intensity
 
 
 class IntensityTest(unittest.TestCase):

@@ -1,11 +1,11 @@
+import datetime as dt
 import unittest
 
 from jasiapi import (
-    statistics,
-    StatisticsSummary,
     Statistics,
+    StatisticsSummary,
+    statistics,
 )
-import datetime as dt
 
 
 class StatisticsTest(unittest.TestCase):
