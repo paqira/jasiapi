@@ -15,7 +15,7 @@ from 1919 until 2 days ago (UTC+9).
 
 ## Usage
 
-You can install from PyPI:
+You can install from GitHub:
 
 ```shell
 pip install git+https://github.com/paqira/jasiapi

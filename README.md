@@ -7,7 +7,7 @@ This package provides unofficial Python binding of *[JMA Seismic Intensity DB Se
 
 ## Usage
 
-You can install `jasiapi` from PyPI:
+You can install `jasiapi` from GitHub:
 
 ```shell
 pip install git+https://github.com/paqira/jasiapi
