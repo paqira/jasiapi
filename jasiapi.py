@@ -22,7 +22,7 @@ __all__ = [
     "BadRequestError",
 ]
 
-__version__: Final = "0.1.0"
+__version__ = "0.1.0"
 
 TOP: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/index.html"
 URL: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/api/api.php"
