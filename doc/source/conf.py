@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
-project = "jpsidb"
+project = "jasiapi"
 copyright = "2024, Kentaro Tatsumi"
 author = "Kentaro Tatsumi"
 

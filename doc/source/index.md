@@ -18,7 +18,7 @@ from 1919 until 2 days ago (UTC+9).
 You can install from PyPI:
 
 ```shell
-pip install jasiapi
+pip install git+https://github.com/paqira/jasiapi
 ```
 
 Notes,
