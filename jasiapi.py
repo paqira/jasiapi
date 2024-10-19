@@ -31,12 +31,13 @@ __version__ = "0.1.0"
 
 TIMEOUT: Final = 30
 
-TOP: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/index.html"
-URL: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/api/api.php"
+BASE_URL: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/"
+TOP_URL: Final = BASE_URL + "index.html"
+API_URL: Final = BASE_URL + "api/api.php"
 
-EPICENTER: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/js/epi.json"
-CITY: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/js/city.json"
-STATION: Final = "https://www.data.jma.go.jp/svd/eqdb/data/shindo/js/station.json"
+EPICENTER_URL: Final = BASE_URL + "js/epi.json"
+CITY_URL: Final = BASE_URL + "js/city.json"
+STATION_URL: Final = BASE_URL + "js/station.json"
 
 PREFECTURE: Final = {
     10: "北海道",
@@ -108,7 +109,7 @@ class CodeResolver:
 
     @cached_property
     def _city(self) -> dict[int, str]:
-        res = requests.get(CITY, timeout=TIMEOUT)
+        res = requests.get(CITY_URL, timeout=TIMEOUT)
         return {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
 
     @cached_property
@@ -117,12 +118,12 @@ class CodeResolver:
 
     @cached_property
     def _station(self) -> dict[int, str]:
-        res = requests.get(STATION, timeout=TIMEOUT)
+        res = requests.get(STATION_URL, timeout=TIMEOUT)
         return {int(obj["code"]): obj["name"] for obj in res.json() if obj["disp"]}
 
     @cached_property
     def _region(self) -> tuple[str]:
-        res = requests.get(EPICENTER, timeout=TIMEOUT)
+        res = requests.get(EPICENTER_URL, timeout=TIMEOUT)
         return tuple(obj["name"] for obj in res.json())
 
     @cached_property
@@ -864,7 +865,7 @@ def _intensity_parse(json: dict) -> tuple[list[Intensity], Earthquake]:
 
 
 def _request(data: dict[str, Any], timeout):
-    res = requests.post(URL, data=data, timeout=timeout)
+    res = requests.post(API_URL, data=data, timeout=timeout)
     return res.json()
 
 
