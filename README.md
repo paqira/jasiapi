@@ -10,7 +10,7 @@ This package provides unofficial Python binding of *[JMA Seismic Intensity DB Se
 You can install `jasiapi` from PyPI:
 
 ```shell
-pip install jasiapi
+pipx install git+https://github.com/paqira/jasiapi
 ```
 
 One can online search to fundamental information of the earthquake event at Japan,
